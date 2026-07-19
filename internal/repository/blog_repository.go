@@ -116,10 +116,12 @@ func UpdateBlog(pool *pgxpool.Pool,id int,title string,content string)(*models.B
 	defer cancel()
 
 	var query string = `
-		UPDATE blogs
-		set title = $1, content = $2, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $3
-		RETURNING id,title,content,created_at,updated_at
+	UPDATE blogs
+	SET title = COALESCE($1, title),
+		content = COALESCE($2, content),
+		updated_at = CURRENT_TIMESTAMP
+	WHERE id = $3
+	RETURNING id, title, content, created_at, updated_at
 	`
 
 	var blog models.Blog

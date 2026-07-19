@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"rest-api/internal/repository"
 	"strconv"
-	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -16,8 +16,8 @@ type CreateBlogRequest struct {
 }
 
 type UpdateBlogRequest struct {
-	Title   string `json:"title"`
-    Content string `json:"content"`
+	Title   *string `json:"title"`
+    Content *string `json:"content"`
 }
 
 func CreateBlogHandler(pool *pgxpool.Pool) gin.HandlerFunc {
@@ -97,22 +97,40 @@ func UpdateBlogHandler(pool *pgxpool.Pool) gin.HandlerFunc{
 			return
 		}
 
-		if strings.TrimSpace(input.Title) == "" || strings.TrimSpace(input.Content) == "" {
+		if input.Title == nil && input.Content == nil {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "Title and content must be filled",
+				"error": "at leats one field ( Title / content) must be filled",
 			})
 			return
 		}
 
-		blog,err := repository.UpdateBlog(pool,id,input.Title,input.Content)
+		exist,err := repository.GetBlogByID(pool,id)
+
 		if err != nil {
 			if err == pgx.ErrNoRows{
 				c.JSON(http.StatusNotFound, gin.H{"error" : "Blog not found!"})
 				return
 			}
-
-			c.JSON(http.StatusInternalServerError,gin.H{"error" : err.Error()})
 		}
+
+		title := exist.Title
+		if input.Title != nil{
+			title = *input.Title
+		}
+
+		
+		content := exist.Content
+		if input.Content != nil {
+			content = *input.Content
+		}
+
+		blog,err := repository.UpdateBlog(pool,id,title,content)
+
+		if err != nil{
+			c.JSON(http.StatusInternalServerError,gin.H{"error" : err.Error()})
+			return
+		}
+		
 
 		c.JSON(http.StatusOK,blog)
 
