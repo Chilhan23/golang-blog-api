@@ -59,7 +59,7 @@ func GetBlogByIDHandler(pool *pgxpool.Pool) gin.HandlerFunc{
 		id,err := strconv.Atoi(idStr)
 
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error" : "invalid todo id"})
+			c.JSON(http.StatusBadRequest, gin.H{"error" : "invalid blog id"})
 			return 
 		}
 
