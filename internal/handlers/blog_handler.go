@@ -35,7 +35,7 @@ func CreateBlogHandler(pool *pgxpool.Pool) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"blog": blog})
+		c.JSON(http.StatusCreated, gin.H{"message": "Blog created successfully", "blog": blog})
 	}
 }
 
@@ -48,7 +48,7 @@ func GetALLBlogsHandler(pool *pgxpool.Pool) gin.HandlerFunc {
 			return 
 		}
 
-		c.JSON(http.StatusOK, blogs)
+		c.JSON(http.StatusOK, gin.H{"message": "Blogs retrieved successfully", "blogs": blogs})
 	}
 }
 
@@ -74,7 +74,7 @@ func GetBlogByIDHandler(pool *pgxpool.Pool) gin.HandlerFunc{
 			return
 		}
 
-		c.JSON(http.StatusOK,blog)
+		c.JSON(http.StatusOK, gin.H{"message": "Blog retrieved successfully", "blog": blog})
 
 	}
 }
@@ -132,8 +132,36 @@ func UpdateBlogHandler(pool *pgxpool.Pool) gin.HandlerFunc{
 		}
 		
 
-		c.JSON(http.StatusOK,blog)
+		c.JSON(http.StatusOK, gin.H{"message": "Blog updated successfully", "blog": blog})
 
 		
+	}
+}
+
+func DeleteBlogHandler(pool *pgxpool.Pool) gin.HandlerFunc{
+	return func(c *gin.Context) {
+		idSTr := c.Param("id")
+
+		id,err := strconv.Atoi(idSTr)
+
+		if err != nil{
+			c.JSON(http.StatusBadRequest, gin.H{"error" : "Invalid Blog ID"})
+			return 
+		}
+
+		blog,err := repository.DeleteBlog(pool,id)
+		if err != nil {
+			if err == pgx.ErrNoRows{
+				c.JSON(http.StatusNotFound, gin.H{"error" : "Blog Not Found"})
+				return
+			}
+
+			c.JSON(http.StatusInternalServerError, gin.H{"error" : err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Blog deleted successfully",
+			"blog":    blog,
+		})
 	}
 }

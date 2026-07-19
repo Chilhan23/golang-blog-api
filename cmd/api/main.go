@@ -39,6 +39,7 @@ func main(){
 	route.GET("/blogs",handlers.GetALLBlogsHandler(pool))
 	route.GET("/blogs/:id",handlers.GetBlogByIDHandler(pool))
 	route.PUT("/blogs/:id",handlers.UpdateBlogHandler(pool))	
+	route.DELETE("/blogs/:id",handlers.DeleteBlogHandler(pool))
 
 	route.Run(":" + cfg.Port)
 }	
