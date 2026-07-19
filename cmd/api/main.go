@@ -37,6 +37,8 @@ func main(){
 
 	route.POST("/blogs",handlers.CreateBlogHandler(pool))
 	route.GET("/blogs",handlers.GetALLBlogsHandler(pool))
+	route.GET("/blogs/:id",handlers.GetBlogByIDHandler(pool))
+	
 
 	route.Run(":" + cfg.Port)
 }	

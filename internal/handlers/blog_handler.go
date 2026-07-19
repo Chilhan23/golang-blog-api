@@ -3,8 +3,10 @@ package handlers
 import (
 	"net/http"
 	"rest-api/internal/repository"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -42,5 +44,32 @@ func GetALLBlogsHandler(pool *pgxpool.Pool) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, blogs)
+	}
+}
+
+func GetBlogByIDHandler(pool *pgxpool.Pool) gin.HandlerFunc{
+	return func(c *gin.Context) {
+		idStr :=  c.Param("id")
+
+		id,err := strconv.Atoi(idStr)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error" : "invalid todo id"})
+			return 
+		}
+
+		blog,err := repository.GetBlogByID(pool,id)
+		if err != nil {
+			if err == pgx.ErrNoRows{
+				c.JSON(http.StatusNotFound, gin.H{"error" : "Blog Not Found"})
+				return
+			}
+
+			c.JSON(http.StatusInternalServerError, gin.H{"error" : err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK,blog)
+
 	}
 }

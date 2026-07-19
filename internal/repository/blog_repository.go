@@ -80,4 +80,31 @@ func GetAllBlogs(pool *pgxpool.Pool)([]models.Blog,error){
 	return blogs, nil
 }
 
- 
+func GetBlogByID(pool *pgxpool.Pool, id int)(*models.Blog,error){
+	var ctx context.Context
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithTimeout(context.Background(),5 *time.Second)
+	defer cancel()
+
+	var query = `
+		SELECT id,title,content,created_at,updated_at
+		FROM blogs
+		WHERE ID = $1
+	`
+	var blog models.Blog
+
+	err := pool.QueryRow(ctx,query,id).Scan(
+		&blog.ID,
+		&blog.Title,
+		&blog.Content,
+		&blog.CreatedAt,
+		&blog.UpdatedAt,
+	)
+
+	if err != nil{
+		return nil, err
+	}
+
+	return &blog,nil
+
+}
