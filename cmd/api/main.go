@@ -3,6 +3,7 @@ package main
 import (
 	"rest-api/internal/config"
 	"rest-api/internal/database"
+	"rest-api/internal/handlers"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -33,6 +34,9 @@ func main(){
 			"database": "connected",
 		})
 	})
+
+	route.POST("/blogs",handlers.CreateBlogHandler(pool))
+	route.GET("/blogs",handlers.GetALLBlogsHandler(pool))
 
 	route.Run(":" + cfg.Port)
 }	
