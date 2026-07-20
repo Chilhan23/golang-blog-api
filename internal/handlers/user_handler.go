@@ -1,12 +1,16 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
-	 "errors"
+	"rest-api/internal/config"
 	"rest-api/internal/models"
 	"rest-api/internal/repository"
 	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
@@ -14,10 +18,20 @@ import (
 
 
 type UserRegister struct{
-	Username string `json:"username" biding:"required"`
-	Email string    `json:"email" biding:"required"`
-	Password string `json:"password" biding:"required"`
+	Username string `json:"username" binding:"required"`
+	Email string    `json:"email" binding:"required"`
+	Password string `json:"password" binding:"required"`
 }
+
+type UserLogin struct{
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+type LoginResponse struct{
+	Token string `json:"token"`
+}
+
 
 func CreateUserHandler(pool *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -78,5 +92,41 @@ func CreateUserHandler(pool *pgxpool.Pool) gin.HandlerFunc {
 		}
 		c.JSON(http.StatusCreated,CreateUser)
 
+	}
+}
+
+func LoginHandler(pool *pgxpool.Pool,cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var LoginRequest UserLogin
+
+		if err := c.BindJSON(&LoginRequest); err != nil{
+			c.JSON(http.StatusBadRequest,gin.H{"error" : err.Error()})
+			return
+		}
+
+		user,err := repository.GetUserByUsername(pool,LoginRequest.Username)
+		if err != nil{
+			 c.JSON(http.StatusUnauthorized, gin.H{"error" : "invalid credential"})
+			 return
+		}
+		err = bcrypt.CompareHashAndPassword([]byte(user.Password),[]byte(LoginRequest.Password))
+		if err != nil{
+			c.JSON(http.StatusUnauthorized,gin.H{"error" : "Invalid credential"})
+			return 
+		}
+		claims := jwt.MapClaims{
+			"user_id" : user.ID,
+			"username" : user.Username,
+			"exp" : time.Now().Add(24 * time.Hour).Unix(),
+		}
+
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256,claims)
+		tokenstring,err := token.SignedString([]byte(cfg.JWTSecret))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError,gin.H{"error" : "failed generate token jwt" + err.Error()})
+			return 
+		}
+
+		c.JSON(http.StatusOK,LoginResponse{Token : tokenstring})
 	}
 }

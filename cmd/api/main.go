@@ -44,6 +44,7 @@ func main(){
 
 	//User Routee
 	route.POST("/auth/register",handlers.CreateUserHandler(pool))
+	route.POST("/auth/login",handlers.LoginHandler(pool,cfg))
 
 	route.Run(":" + cfg.Port)
 }	
