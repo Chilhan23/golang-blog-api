@@ -35,11 +35,15 @@ func main(){
 		})
 	})
 
+	// BLOG Route
 	route.POST("/blogs",handlers.CreateBlogHandler(pool))
 	route.GET("/blogs",handlers.GetALLBlogsHandler(pool))
 	route.GET("/blogs/:id",handlers.GetBlogByIDHandler(pool))
 	route.PUT("/blogs/:id",handlers.UpdateBlogHandler(pool))	
 	route.DELETE("/blogs/:id",handlers.DeleteBlogHandler(pool))
+
+	//User Routee
+	route.POST("/auth/register",handlers.CreateUserHandler(pool))
 
 	route.Run(":" + cfg.Port)
 }	
