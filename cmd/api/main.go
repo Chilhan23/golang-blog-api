@@ -36,19 +36,22 @@ func main(){
 		})
 	})
 
-	//User Routee
-	route.POST("/auth/register",handlers.CreateUserHandler(pool))
-	route.POST("/auth/login",handlers.LoginHandler(pool,cfg))
+	// User Routes
+	route.POST("/auth/register", handlers.CreateUserHandler(pool))
+	route.POST("/auth/login", handlers.LoginHandler(pool, cfg))
 
-	// BLOG Route
+	// Public Blog Routes
+	route.GET("/blogs", handlers.GetALLBlogsHandler(pool))
+	route.GET("/blogs/:id", handlers.GetBlogByIDHandler(pool))
+
+	// Protected Blog Routes
 	protected := route.Group("/blogs")
 	protected.Use(middleware.AuthMiddleware(cfg))
 	{
-		protected.POST("",handlers.CreateBlogHandler(pool))
-		protected.GET("",handlers.GetALLBlogsHandler(pool))
-		protected.GET("/:id",handlers.GetBlogByIDHandler(pool))
-		protected.PUT("/:id",handlers.UpdateBlogHandler(pool))	
-		protected.DELETE("/:id",handlers.DeleteBlogHandler(pool))
+		protected.POST("", handlers.CreateBlogHandler(pool))
+		protected.GET("/user", handlers.GetBlogsByUserIDHandler(pool))
+		protected.PUT("/:id", handlers.UpdateBlogHandler(pool))
+		protected.DELETE("/:id", handlers.DeleteBlogHandler(pool))
 	}
 	
 

@@ -50,7 +50,19 @@ func CreateBlogHandler(pool *pgxpool.Pool) gin.HandlerFunc {
 
 func GetALLBlogsHandler(pool *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		blogs, err := repository.GetAllBlogs(pool)
 
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) 
+			return 
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Blogs retrieved successfully", "blogs": blogs})
+	}
+}
+
+func GetBlogsByUserIDHandler(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
 		userIDInterface,exists := c.Get("user_id")
 
 		if !exists{
@@ -58,8 +70,7 @@ func GetALLBlogsHandler(pool *pgxpool.Pool) gin.HandlerFunc {
 			return 
 		}
 		userID := userIDInterface.(string)
-
-		blogs, err := repository.GetAllBlogs(pool,userID)
+		blogs, err := repository.GetBlogsByUserID(pool,userID)
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) 
@@ -72,15 +83,6 @@ func GetALLBlogsHandler(pool *pgxpool.Pool) gin.HandlerFunc {
 
 func GetBlogByIDHandler(pool *pgxpool.Pool) gin.HandlerFunc{
 	return func(c *gin.Context) {
-
-		userIDInterface,exists := c.Get("user_id")
-
-		if !exists{
-			c.JSON(http.StatusInternalServerError,gin.H{"error" : "user_id not found bruh :D"})
-			return 
-		}
-		userID := userIDInterface.(string)
-
 		idStr :=  c.Param("id")
 
 		id,err := strconv.Atoi(idStr)
@@ -90,7 +92,7 @@ func GetBlogByIDHandler(pool *pgxpool.Pool) gin.HandlerFunc{
 			return 
 		}
 
-		blog,err := repository.GetBlogByID(pool,id,userID)
+		blog,err := repository.GetBlogByID(pool,id)
 		if err != nil {
 			if err == pgx.ErrNoRows{
 				c.JSON(http.StatusNotFound, gin.H{"error" : "Blog Not Found"})
@@ -139,13 +141,18 @@ func UpdateBlogHandler(pool *pgxpool.Pool) gin.HandlerFunc{
 			return
 		}
 
-		exist,err := repository.GetBlogByID(pool,id,userID)
-
+		exist, err := repository.GetBlogByID(pool, id)
 		if err != nil {
-			if err == pgx.ErrNoRows{
-				c.JSON(http.StatusNotFound, gin.H{"error" : "Blog not found!"})
+			if err == pgx.ErrNoRows {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Blog not found"})
 				return
 			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if exist.UserID != userID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to edit this blog"}) 
+			return
 		}
 
 		title := exist.Title

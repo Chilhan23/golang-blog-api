@@ -35,7 +35,53 @@ func CreateBlog(pool *pgxpool.Pool, title string, content string,userID string)(
 	return &blog, nil
 }
 
-func GetAllBlogs(pool *pgxpool.Pool,userID string)([]models.Blog,error){
+func GetAllBlogs(pool *pgxpool.Pool)([]models.Blog,error){
+	var ctx context.Context
+	var cancel context.CancelFunc
+
+	ctx, cancel = context.WithTimeout(context.Background(),5*time.Second)
+	defer cancel()
+
+	var query = `
+		SELECT id,title,content,created_at,updated_at
+		FROM blogs
+		ORDER BY created_at DESC
+	`
+	var rows, err = pool.Query(ctx,query)
+	if err != nil{
+		return nil,err
+	}
+
+	defer rows.Close()
+
+	var blogs []models.Blog = []models.Blog{}
+
+	for rows.Next(){
+		var blog models.Blog
+
+		err = rows.Scan(
+			&blog.ID,
+			&blog.Title,
+			&blog.Content,
+			&blog.CreatedAt,
+			&blog.UpdatedAt,
+		)
+
+		if err != nil{
+			return nil,err
+		}
+
+		blogs = append(blogs, blog)
+	}
+
+	if err = rows.Err(); err != nil{
+		return nil,err
+	}
+
+	return blogs, nil
+}
+
+func GetBlogsByUserID(pool *pgxpool.Pool,userID string)([]models.Blog,error){
 	var ctx context.Context
 	var cancel context.CancelFunc
 
@@ -83,7 +129,7 @@ func GetAllBlogs(pool *pgxpool.Pool,userID string)([]models.Blog,error){
 	return blogs, nil
 }
 
-func GetBlogByID(pool *pgxpool.Pool, id int,userID string)(*models.Blog,error){
+func GetBlogByID(pool *pgxpool.Pool, id int)(*models.Blog,error){
 	var ctx context.Context
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithTimeout(context.Background(),5 *time.Second)
@@ -92,11 +138,11 @@ func GetBlogByID(pool *pgxpool.Pool, id int,userID string)(*models.Blog,error){
 	var query = `
 		SELECT id,title,content,created_at,updated_at,user_id
 		FROM blogs
-		WHERE ID = $1 AND user_id = $2
+		WHERE ID = $1
 	`
 	var blog models.Blog
 
-	err := pool.QueryRow(ctx,query,id,userID).Scan(
+	err := pool.QueryRow(ctx,query,id).Scan(
 		&blog.ID,
 		&blog.Title,
 		&blog.Content,
