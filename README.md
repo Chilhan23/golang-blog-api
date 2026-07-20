@@ -1,6 +1,6 @@
 # Golang Blog API
 
-A RESTful blog API built with Go, Gin, and PostgreSQL. Designed with a clean architecture pattern separating concerns into handlers, repositories, and models.
+A RESTful blog API built with Go, Gin, and PostgreSQL. Designed with a clean architecture pattern separating concerns into handlers, repositories, models, and middleware.
 
 ## Tech Stack
 
@@ -8,6 +8,7 @@ A RESTful blog API built with Go, Gin, and PostgreSQL. Designed with a clean arc
 - **Framework:** [Gin](https://github.com/gin-gonic/gin)
 - **Database:** PostgreSQL
 - **Driver:** [pgx v5](https://github.com/jackc/pgx) (connection pool)
+- **Authentication:** JWT (JSON Web Tokens) & bcrypt
 - **Migration:** [golang-migrate](https://github.com/golang-migrate/migrate)
 - **Hot Reload:** [Air](https://github.com/air-verse/air)
 
@@ -17,24 +18,31 @@ A RESTful blog API built with Go, Gin, and PostgreSQL. Designed with a clean arc
 .
 ├── cmd/
 │   └── api/
-│       └── main.go              # Application entrypoint
+│       └── main.go                  # Application entrypoint & routes
 ├── internal/
 │   ├── config/
-│   │   └── config.go            # Environment configuration
+│   │   └── config.go                # Environment configuration
 │   ├── database/
-│   │   └── postgres.go          # Database connection pool
+│   │   └── postgres.go              # Database connection pool
 │   ├── handlers/
-│   │   └── blog_handler.go      # HTTP request handlers
-│   ├── middleware/               # Middleware (planned)
+│   │   ├── blog_handler.go          # Blog HTTP handlers
+│   │   ├── category_handler.go      # Category HTTP handlers
+│   │   └── user_handler.go          # User authentication handlers
+│   ├── middleware/
+│   │   └── auth_middleware.go       # JWT Authentication middleware
 │   ├── models/
-│   │   └── blog.go              # Data models
+│   │   ├── blog.go                  # Blog model
+│   │   ├── category.go              # Category model
+│   │   └── user.go                  # User model
 │   └── repository/
-│       └── blog_repository.go   # Database queries
-├── migrations/                   # SQL migration files
+│       ├── blog_repository.go       # Blog database queries
+│       ├── category_repository.go   # Category database queries
+│       └── user_repository.go       # User database queries
+├── migrations/                       # SQL migration files
 ├── scripts/
-│   └── migrate.sh               # Migration helper script
-├── .air.toml                     # Air hot reload config
-├── .env                          # Environment variables
+│   └── migrate.sh                   # Migration helper script
+├── .air.toml                         # Air hot reload config
+├── .env                              # Environment variables
 ├── go.mod
 └── go.sum
 ```
@@ -68,8 +76,9 @@ go mod download
 Create a `.env` file in the project root:
 
 ```env
-DATABASE_URL=postgresql://<user>:<password>@localhost:5432/<dbname>?sslmode=disable
+DATABASE_URL=postgresql://postgres:password@localhost:5432/blog_api?sslmode=disable
 PORT=8080
+JWT_SECRET=your_super_secret_jwt_key
 ```
 
 4. Create the database
@@ -81,10 +90,6 @@ psql -U postgres -c "CREATE DATABASE blog_api;"
 5. Run migrations
 
 ```bash
-# Install golang-migrate (if not installed)
-go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
-
-# Apply all migrations
 ./scripts/migrate.sh up
 ```
 
@@ -106,45 +111,76 @@ The server will start at `http://localhost:8080`.
 
 ### Health Check
 
-```
-GET /
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET`  | `/`      | No   | Server health check & DB status |
+
+---
+
+### Authentication
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `POST` | `/auth/register` | No | Register a new user |
+| `POST` | `/auth/login`    | No | Authenticate user & receive JWT token |
+
+#### `POST /auth/register`
+
+```bash
+curl -X POST http://localhost:8080/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username": "johndoe", "email": "john@example.com", "password": "password123"}'
 ```
 
-**Response** `200 OK`
+#### `POST /auth/login`
 
-```json
-{
-  "message": "Go Gin API is running",
-  "status": "success",
-  "database": "connected"
-}
+```bash
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "johndoe", "password": "password123"}'
+```
+
+---
+
+### Categories
+
+| Method   | Endpoint          | Auth | Description |
+|----------|-------------------|------|-------------|
+| `POST`   | `/categories`     | Yes  | Create a new category |
+| `GET`    | `/categories`     | No   | Get all categories |
+| `GET`    | `/categories/:id` | No   | Get category by ID |
+| `PUT`    | `/categories/:id` | Yes  | Update category |
+| `DELETE` | `/categories/:id` | Yes  | Delete category |
+
+#### `POST /categories`
+
+```bash
+curl -X POST http://localhost:8080/categories \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Technology", "slug": "technology"}'
 ```
 
 ---
 
 ### Blog Posts
 
-| Method   | Endpoint     | Description          |
-|----------|--------------|----------------------|
-| `POST`   | `/blogs`     | Create a blog post   |
-| `GET`    | `/blogs`     | Get all blog posts   |
-| `GET`    | `/blogs/:id` | Get a blog post by ID|
-| `PUT`    | `/blogs/:id` | Update a blog post   |
-| `DELETE` | `/blogs/:id` | Delete a blog post   |
+| Method   | Endpoint          | Auth | Description |
+|----------|-------------------|------|-------------|
+| `GET`    | `/blogs`          | No   | Get all public blog posts (with category names via `LEFT JOIN`) |
+| `GET`    | `/blogs/:id`      | No   | Get blog post by ID |
+| `POST`   | `/blogs`          | Yes  | Create a new blog post |
+| `GET`    | `/blogs/user`     | Yes  | Get blog posts authored by logged-in user |
+| `PUT`    | `/blogs/:id`      | Yes  | Update blog post (Owner only) |
+| `DELETE` | `/blogs/:id`      | Yes  | Delete blog post (Owner only) |
 
-#### `POST /blogs` -- Create a Blog Post
-
-**Request Body**
-
-| Field     | Type   | Required | Description        |
-|-----------|--------|----------|--------------------|
-| `title`   | string | Yes      | Title of the post  |
-| `content` | string | Yes      | Content of the post|
+#### `POST /blogs`
 
 ```bash
 curl -X POST http://localhost:8080/blogs \
+  -H "Authorization: Bearer <TOKEN>" \
   -H "Content-Type: application/json" \
-  -d '{"title": "Hello World", "content": "This is my first post."}'
+  -d '{"title": "Golang REST API", "content": "Building APIs with Gin and PostgreSQL", "category_id": 1}'
 ```
 
 ```json
@@ -153,15 +189,17 @@ curl -X POST http://localhost:8080/blogs \
   "message": "Blog created successfully",
   "blog": {
     "id": 1,
-    "title": "Hello World",
-    "content": "This is my first post.",
-    "created_at": "2026-07-19T12:00:00Z",
-    "updated_at": "2026-07-19T12:00:00Z"
+    "title": "Golang REST API",
+    "content": "Building APIs with Gin and PostgreSQL",
+    "created_at": "2026-07-20T21:50:00Z",
+    "updated_at": "2026-07-20T21:50:00Z",
+    "user_id": "77051b22-ea10-4a78-a7de-f880e5b6d60a",
+    "category_id": 1
   }
 }
 ```
 
-#### `GET /blogs` -- Get All Blog Posts
+#### `GET /blogs`
 
 ```bash
 curl http://localhost:8080/blogs
@@ -174,110 +212,30 @@ curl http://localhost:8080/blogs
   "blogs": [
     {
       "id": 1,
-      "title": "Hello World",
-      "content": "This is my first post.",
-      "created_at": "2026-07-19T12:00:00Z",
-      "updated_at": "2026-07-19T12:00:00Z"
+      "title": "Golang REST API",
+      "content": "Building APIs with Gin and PostgreSQL",
+      "created_at": "2026-07-20T21:50:00Z",
+      "updated_at": "2026-07-20T21:50:00Z",
+      "user_id": "77051b22-ea10-4a78-a7de-f880e5b6d60a",
+      "category_id": 1,
+      "category_name": "Technology"
     }
   ]
 }
 ```
 
-#### `GET /blogs/:id` -- Get a Blog Post by ID
-
-```bash
-curl http://localhost:8080/blogs/1
-```
-
-```json
-// 200 OK
-{
-  "message": "Blog retrieved successfully",
-  "blog": {
-    "id": 1,
-    "title": "Hello World",
-    "content": "This is my first post.",
-    "created_at": "2026-07-19T12:00:00Z",
-    "updated_at": "2026-07-19T12:00:00Z"
-  }
-}
-```
-
-```json
-// 404 Not Found
-{
-  "error": "Blog Not Found"
-}
-```
-
-#### `PUT /blogs/:id` -- Update a Blog Post
-
-Supports partial updates. Only the fields included in the request body will be updated. At least one field must be provided.
-
-**Request Body**
-
-| Field     | Type   | Required | Description          |
-|-----------|--------|----------|----------------------|
-| `title`   | string | No       | New title of the post|
-| `content` | string | No       | New content          |
-
-```bash
-curl -X PUT http://localhost:8080/blogs/1 \
-  -H "Content-Type: application/json" \
-  -d '{"title": "Updated Title"}'
-```
-
-```json
-// 200 OK
-{
-  "message": "Blog updated successfully",
-  "blog": {
-    "id": 1,
-    "title": "Updated Title",
-    "content": "This is my first post.",
-    "created_at": "2026-07-19T12:00:00Z",
-    "updated_at": "2026-07-19T12:30:00Z"
-  }
-}
-```
-
-#### `DELETE /blogs/:id` -- Delete a Blog Post
-
-```bash
-curl -X DELETE http://localhost:8080/blogs/1
-```
-
-```json
-// 200 OK
-{
-  "message": "Blog deleted successfully",
-  "blog": {
-    "id": 1,
-    "title": "Hello World",
-    "content": "This is my first post.",
-    "created_at": "2026-07-19T12:00:00Z",
-    "updated_at": "2026-07-19T12:00:00Z"
-  }
-}
-```
-
 ---
 
-### Error Responses
+### Error Handling
 
-All error responses follow this format:
-
-```json
-{
-  "error": "error description"
-}
-```
-
-| Status Code | Description                          |
-|-------------|--------------------------------------|
-| `400`       | Bad request or invalid input         |
-| `404`       | Resource not found                   |
-| `500`       | Internal server error                |
+| Status Code | Description |
+|-------------|-------------|
+| `400 Bad Request` | Invalid JSON input or validation failure |
+| `401 Unauthorized` | Missing, invalid, or expired JWT token |
+| `403 Forbidden` | User is not the owner of the resource |
+| `404 Not Found` | Requested resource does not exist |
+| `409 Conflict` | Duplicate resource (e.g. username/email/category name already exists) |
+| `500 Internal Server Error` | Unexpected server error (masked for security) |
 
 ---
 
@@ -294,6 +252,7 @@ A helper script is provided to manage migrations using `golang-migrate`.
 ./scripts/migrate.sh redo            # Rollback last and re-apply
 ./scripts/migrate.sh status          # Show current version
 ./scripts/migrate.sh force <V>       # Force set version (fix dirty state)
+./scripts/migrate.sh fresh           # Drop all tables & re-apply all
 ```
 
 ---
@@ -301,10 +260,12 @@ A helper script is provided to manage migrations using `golang-migrate`.
 ## Roadmap
 
 - [x] Blog CRUD (Create, Read, Update, Delete)
-- [ ] User authentication (JWT)
-- [ ] Categories (one-to-many with posts)
+- [x] User Authentication & Authorization (JWT & bcrypt)
+- [x] Blog Ownership Authorization (Owner-only Edit/Delete)
+- [x] Categories CRUD & Foreign Key Relation (`category_id` & `LEFT JOIN`)
+- [x] Masked Error Handling for Security
 - [ ] Likes
-- [ ] Comments
+- [ ] Comments with reply threads
 
 ---
 
