@@ -45,15 +45,20 @@ func main(){
 	route.GET("/blogs/:id", handlers.GetBlogByIDHandler(pool))
 
 	// Protected Blog Routes
-	protected := route.Group("/blogs")
-	protected.Use(middleware.AuthMiddleware(cfg))
+	protectedBlogs := route.Group("/blogs")
+	protectedBlogs.Use(middleware.AuthMiddleware(cfg))
 	{
-		protected.POST("", handlers.CreateBlogHandler(pool))
-		protected.GET("/user", handlers.GetBlogsByUserIDHandler(pool))
-		protected.PUT("/:id", handlers.UpdateBlogHandler(pool))
-		protected.DELETE("/:id", handlers.DeleteBlogHandler(pool))
+		protectedBlogs.POST("", handlers.CreateBlogHandler(pool))
+		protectedBlogs.GET("/user", handlers.GetBlogsByUserIDHandler(pool))
+		protectedBlogs.PUT("/:id", handlers.UpdateBlogHandler(pool))
+		protectedBlogs.DELETE("/:id", handlers.DeleteBlogHandler(pool))
 	}
-	
+
+	protectedCategories := route.Group("/categories")
+	protectedCategories.Use(middleware.AuthMiddleware(cfg))
+	{
+		protectedCategories.POST("", handlers.CreateCategoryHandler(pool))
+	}
 
 	route.Run(":" + cfg.Port)
-}	
+}
