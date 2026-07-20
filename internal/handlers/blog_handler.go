@@ -22,13 +22,22 @@ type UpdateBlogRequest struct {
 
 func CreateBlogHandler(pool *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context){
+
+		userIDInterface,exists := c.Get("user_id")
+
+		if !exists{
+			c.JSON(http.StatusInternalServerError,gin.H{"error" : "user_id not found bruh :D"})
+			return 
+		}
+		userID := userIDInterface.(string)
+
 		var input CreateBlogRequest
 		if err := c.ShouldBindJSON(&input); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
-		blog, err := repository.CreateBlog(pool, input.Title, input.Content)
+		blog, err := repository.CreateBlog(pool, input.Title, input.Content,userID)
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -41,7 +50,16 @@ func CreateBlogHandler(pool *pgxpool.Pool) gin.HandlerFunc {
 
 func GetALLBlogsHandler(pool *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		blogs, err := repository.GetAllBlogs(pool)
+
+		userIDInterface,exists := c.Get("user_id")
+
+		if !exists{
+			c.JSON(http.StatusInternalServerError,gin.H{"error" : "user_id not found bruh :D"})
+			return 
+		}
+		userID := userIDInterface.(string)
+
+		blogs, err := repository.GetAllBlogs(pool,userID)
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) 
@@ -54,6 +72,15 @@ func GetALLBlogsHandler(pool *pgxpool.Pool) gin.HandlerFunc {
 
 func GetBlogByIDHandler(pool *pgxpool.Pool) gin.HandlerFunc{
 	return func(c *gin.Context) {
+
+		userIDInterface,exists := c.Get("user_id")
+
+		if !exists{
+			c.JSON(http.StatusInternalServerError,gin.H{"error" : "user_id not found bruh :D"})
+			return 
+		}
+		userID := userIDInterface.(string)
+
 		idStr :=  c.Param("id")
 
 		id,err := strconv.Atoi(idStr)
@@ -63,7 +90,7 @@ func GetBlogByIDHandler(pool *pgxpool.Pool) gin.HandlerFunc{
 			return 
 		}
 
-		blog,err := repository.GetBlogByID(pool,id)
+		blog,err := repository.GetBlogByID(pool,id,userID)
 		if err != nil {
 			if err == pgx.ErrNoRows{
 				c.JSON(http.StatusNotFound, gin.H{"error" : "Blog Not Found"})
@@ -81,6 +108,14 @@ func GetBlogByIDHandler(pool *pgxpool.Pool) gin.HandlerFunc{
 
 func UpdateBlogHandler(pool *pgxpool.Pool) gin.HandlerFunc{
 	return func(c *gin.Context) {
+
+		userIDInterface,exists := c.Get("user_id")
+
+		if !exists{
+			c.JSON(http.StatusInternalServerError,gin.H{"error" : "user_id not found bruh :D"})
+			return 
+		}
+		userID := userIDInterface.(string)
 		idSTr := c.Param("id")
 
 		id,err := strconv.Atoi(idSTr)
@@ -104,7 +139,7 @@ func UpdateBlogHandler(pool *pgxpool.Pool) gin.HandlerFunc{
 			return
 		}
 
-		exist,err := repository.GetBlogByID(pool,id)
+		exist,err := repository.GetBlogByID(pool,id,userID)
 
 		if err != nil {
 			if err == pgx.ErrNoRows{
@@ -124,7 +159,7 @@ func UpdateBlogHandler(pool *pgxpool.Pool) gin.HandlerFunc{
 			content = *input.Content
 		}
 
-		blog,err := repository.UpdateBlog(pool,id,title,content)
+		blog,err := repository.UpdateBlog(pool,id,title,content,userID)
 
 		if err != nil{
 			c.JSON(http.StatusInternalServerError,gin.H{"error" : err.Error()})
@@ -140,6 +175,13 @@ func UpdateBlogHandler(pool *pgxpool.Pool) gin.HandlerFunc{
 
 func DeleteBlogHandler(pool *pgxpool.Pool) gin.HandlerFunc{
 	return func(c *gin.Context) {
+		userIDInterface,exists := c.Get("user_id")
+
+		if !exists{
+			c.JSON(http.StatusInternalServerError,gin.H{"error" : "user_id not found bruh :D"})
+			return 
+		}
+		userID := userIDInterface.(string)
 		idSTr := c.Param("id")
 
 		id,err := strconv.Atoi(idSTr)
@@ -149,7 +191,7 @@ func DeleteBlogHandler(pool *pgxpool.Pool) gin.HandlerFunc{
 			return 
 		}
 
-		blog,err := repository.DeleteBlog(pool,id)
+		blog,err := repository.DeleteBlog(pool,id,userID)
 		if err != nil {
 			if err == pgx.ErrNoRows{
 				c.JSON(http.StatusNotFound, gin.H{"error" : "Blog Not Found"})

@@ -4,6 +4,7 @@ import (
 	"rest-api/internal/config"
 	"rest-api/internal/database"
 	"rest-api/internal/handlers"
+	"rest-api/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -35,16 +36,21 @@ func main(){
 		})
 	})
 
-	// BLOG Route
-	route.POST("/blogs",handlers.CreateBlogHandler(pool))
-	route.GET("/blogs",handlers.GetALLBlogsHandler(pool))
-	route.GET("/blogs/:id",handlers.GetBlogByIDHandler(pool))
-	route.PUT("/blogs/:id",handlers.UpdateBlogHandler(pool))	
-	route.DELETE("/blogs/:id",handlers.DeleteBlogHandler(pool))
-
 	//User Routee
 	route.POST("/auth/register",handlers.CreateUserHandler(pool))
 	route.POST("/auth/login",handlers.LoginHandler(pool,cfg))
+
+	// BLOG Route
+	protected := route.Group("/blogs")
+	protected.Use(middleware.AuthMiddleware(cfg))
+	{
+		protected.POST("",handlers.CreateBlogHandler(pool))
+		protected.GET("",handlers.GetALLBlogsHandler(pool))
+		protected.GET("/:id",handlers.GetBlogByIDHandler(pool))
+		protected.PUT("/:id",handlers.UpdateBlogHandler(pool))	
+		protected.DELETE("/:id",handlers.DeleteBlogHandler(pool))
+	}
+	
 
 	route.Run(":" + cfg.Port)
 }	
