@@ -10,7 +10,23 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func main(){
+func CORSMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	}
+}
+
+func main() {
 	var cfg *config.Config
 	var err error
 	cfg, err = config.Load()
@@ -18,8 +34,8 @@ func main(){
 		panic(err)
 	}
 
-	var pool  *pgxpool.Pool
-	pool,err = database.Connect(cfg.DatabaseURL)
+	var pool *pgxpool.Pool
+	pool, err = database.Connect(cfg.DatabaseURL)
 	if err != nil {
 		panic(err)
 	}
@@ -27,11 +43,13 @@ func main(){
 	defer pool.Close()
 
 	var route *gin.Engine = gin.Default()
+	route.Use(CORSMiddleware())
 	route.SetTrustedProxies(nil)
-	route.GET("/",func(c *gin.Context){
+
+	route.GET("/", func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			"message": " Go Gin API is running",
-			"status": "success",
+			"message":  " Go Gin API is running",
+			"status":   "success",
 			"database": "connected",
 		})
 	})
@@ -54,10 +72,17 @@ func main(){
 		protectedBlogs.DELETE("/:id", handlers.DeleteBlogHandler(pool))
 	}
 
+	// Public Category Routes
+	route.GET("/categories", handlers.GetAllCategoryHandler(pool))
+	route.GET("/categories/:id", handlers.GetCategoryByIDHandler(pool))
+
+	// Protected Category Routes
 	protectedCategories := route.Group("/categories")
 	protectedCategories.Use(middleware.AuthMiddleware(cfg))
 	{
 		protectedCategories.POST("", handlers.CreateCategoryHandler(pool))
+		protectedCategories.PUT("/:id", handlers.UpdateCategoryHandler(pool))
+		protectedCategories.DELETE("/:id", handlers.DeleteCategoryHandler(pool))
 	}
 
 	route.Run(":" + cfg.Port)
