@@ -12,4 +12,6 @@ type Blog struct {
 	AuthorName   string    `json:"author_name,omitempty" db:"author_name"`
 	CategoryID   *int      `json:"category_id" db:"category_id"`
 	CategoryName *string   `json:"category_name,omitempty" db:"category_name"`
+	TotalLikes   int       `json:"total_likes" db:"total_likes"`    
+	IsLiked      bool      `json:"is_liked,omitempty" db:"is_liked"`
 }

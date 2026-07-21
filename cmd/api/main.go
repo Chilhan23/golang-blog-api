@@ -68,6 +68,7 @@ func main() {
 	{
 		protectedBlogs.POST("", handlers.CreateBlogHandler(pool))
 		protectedBlogs.GET("/user", handlers.GetBlogsByUserIDHandler(pool))
+		protectedBlogs.POST("/:id/like", handlers.ToggleLikeHandler(pool))
 		protectedBlogs.PUT("/:id", handlers.UpdateBlogHandler(pool))
 		protectedBlogs.DELETE("/:id", handlers.DeleteBlogHandler(pool))
 	}

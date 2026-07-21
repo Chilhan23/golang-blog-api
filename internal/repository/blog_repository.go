@@ -44,10 +44,12 @@ func GetAllBlogs(pool *pgxpool.Pool) ([]models.Blog, error) {
 	defer cancel()
 
 	var query = `
-		SELECT b.id, b.title, b.content, b.created_at, b.updated_at, b.user_id, u.username AS author_name, b.category_id, c.name AS category_name
+		SELECT b.id, b.title, b.content, b.created_at, b.updated_at, b.user_id, u.username AS author_name, b.category_id, c.name AS category_name, COUNT(l.id) AS total_likes
 		FROM blogs b
 		LEFT JOIN users u ON b.user_id = u.id
 		LEFT JOIN categories c ON b.category_id = c.id
+		LEFT JOIN likes l ON b.id = l.blog_id
+		GROUP BY b.id, u.username, c.name
 		ORDER BY b.created_at DESC
 	`
 	var rows, err = pool.Query(ctx, query)
@@ -71,6 +73,7 @@ func GetAllBlogs(pool *pgxpool.Pool) ([]models.Blog, error) {
 			&blog.AuthorName,
 			&blog.CategoryID,
 			&blog.CategoryName,
+			&blog.TotalLikes,
 		)
 		if err != nil {
 			return nil, err
@@ -94,11 +97,13 @@ func GetBlogsByUserID(pool *pgxpool.Pool, userID string) ([]models.Blog, error) 
 	defer cancel()
 
 	var query = `
-		SELECT b.id, b.title, b.content, b.created_at, b.updated_at, b.user_id, u.username AS author_name, b.category_id, c.name AS category_name
+		SELECT b.id, b.title, b.content, b.created_at, b.updated_at, b.user_id, u.username AS author_name, b.category_id, c.name AS category_name, COUNT(l.id) AS total_likes
 		FROM blogs b
 		LEFT JOIN users u ON b.user_id = u.id
 		LEFT JOIN categories c ON b.category_id = c.id
+		LEFT JOIN likes l ON b.id = l.blog_id
 		WHERE b.user_id = $1
+		GROUP BY b.id, u.username, c.name
 		ORDER BY b.created_at DESC
 	`
 	var rows, err = pool.Query(ctx, query, userID)
@@ -122,6 +127,7 @@ func GetBlogsByUserID(pool *pgxpool.Pool, userID string) ([]models.Blog, error) 
 			&blog.AuthorName,
 			&blog.CategoryID,
 			&blog.CategoryName,
+			&blog.TotalLikes,
 		)
 		if err != nil {
 			return nil, err
@@ -144,11 +150,13 @@ func GetBlogByID(pool *pgxpool.Pool, id int) (*models.Blog, error) {
 	defer cancel()
 
 	var query = `
-		SELECT b.id, b.title, b.content, b.created_at, b.updated_at, b.user_id, u.username AS author_name, b.category_id, c.name AS category_name
+		SELECT b.id, b.title, b.content, b.created_at, b.updated_at, b.user_id, u.username AS author_name, b.category_id, c.name AS category_name, COUNT(l.id) AS total_likes
 		FROM blogs b
 		LEFT JOIN users u ON b.user_id = u.id
 		LEFT JOIN categories c ON b.category_id = c.id
+		LEFT JOIN likes l ON b.id = l.blog_id
 		WHERE b.id = $1
+		GROUP BY b.id, u.username, c.name
 	`
 	var blog models.Blog
 
@@ -162,6 +170,7 @@ func GetBlogByID(pool *pgxpool.Pool, id int) (*models.Blog, error) {
 		&blog.AuthorName,
 		&blog.CategoryID,
 		&blog.CategoryName,
+		&blog.TotalLikes,
 	)
 
 	if err != nil {
