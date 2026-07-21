@@ -61,6 +61,7 @@ func main() {
 	// Public Blog Routes
 	route.GET("/blogs", handlers.GetALLBlogsHandler(pool))
 	route.GET("/blogs/:id", handlers.GetBlogByIDHandler(pool))
+	route.GET("/blogs/:id/comments", handlers.GetCommentByIDBlogHandler(pool))
 
 	// Protected Blog Routes
 	protectedBlogs := route.Group("/blogs")
@@ -69,8 +70,16 @@ func main() {
 		protectedBlogs.POST("", handlers.CreateBlogHandler(pool))
 		protectedBlogs.GET("/user", handlers.GetBlogsByUserIDHandler(pool))
 		protectedBlogs.POST("/:id/like", handlers.ToggleLikeHandler(pool))
+		protectedBlogs.POST("/:id/comments", handlers.CreateCommentHandler(pool))
 		protectedBlogs.PUT("/:id", handlers.UpdateBlogHandler(pool))
 		protectedBlogs.DELETE("/:id", handlers.DeleteBlogHandler(pool))
+	}
+
+	// Protected Comment Routes
+	protectedComments := route.Group("/comments")
+	protectedComments.Use(middleware.AuthMiddleware(cfg))
+	{
+		protectedComments.DELETE("/:id", handlers.DeleteCommentHandler(pool))
 	}
 
 	// Public Category Routes
