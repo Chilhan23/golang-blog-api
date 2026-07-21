@@ -76,13 +76,13 @@ func main() {
 	route.GET("/categories", handlers.GetAllCategoryHandler(pool))
 	route.GET("/categories/:id", handlers.GetCategoryByIDHandler(pool))
 
-	// Protected Category Routes
-	protectedCategories := route.Group("/categories")
-	protectedCategories.Use(middleware.AuthMiddleware(cfg))
+	// Admin Category Routes
+	adminCategories := route.Group("/categories")
+	adminCategories.Use(middleware.AuthMiddleware(cfg), middleware.AdminMiddleware())
 	{
-		protectedCategories.POST("", handlers.CreateCategoryHandler(pool))
-		protectedCategories.PUT("/:id", handlers.UpdateCategoryHandler(pool))
-		protectedCategories.DELETE("/:id", handlers.DeleteCategoryHandler(pool))
+		adminCategories.POST("", handlers.CreateCategoryHandler(pool))
+		adminCategories.PUT("/:id", handlers.UpdateCategoryHandler(pool))
+		adminCategories.DELETE("/:id", handlers.DeleteCategoryHandler(pool))
 	}
 
 	route.Run(":" + cfg.Port)

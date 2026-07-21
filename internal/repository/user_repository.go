@@ -43,7 +43,7 @@ func GetUserByUsername(pool *pgxpool.Pool, username string)(*models.User,error){
 	defer cancel()
 
 	var query string = `
-		SELECT id,username,email,password,created_at,updated_at
+		SELECT id,username,email,password,role,created_at,updated_at
 		FROM users
 		WHERE username = $1 
 	`
@@ -54,6 +54,7 @@ func GetUserByUsername(pool *pgxpool.Pool, username string)(*models.User,error){
 		&user.Username,
 		&user.Email,
 		&user.Password,
+		&user.Role,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)

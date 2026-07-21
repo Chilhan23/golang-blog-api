@@ -58,6 +58,10 @@ func AuthMiddleware (cfg *config.Config) gin.HandlerFunc{
 			return 
 		}
 
+		if role, ok := claims["role"].(string); ok {
+			c.Set("role", role) 
+		}
+
 		if exp,ok := claims["exp"].(float64); ok {
 			expirationtime := time.Unix(int64(exp),0)
 
