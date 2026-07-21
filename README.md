@@ -1,16 +1,31 @@
-# Golang Blog API
+# Golang Blog REST API
 
-A RESTful blog API built with Go, Gin, and PostgreSQL. Designed with a clean architecture pattern separating concerns into handlers, repositories, models, and middleware.
+A high-performance, production-ready RESTful Blog API built with Go, Gin Framework, and PostgreSQL. Designed following the Standard Go Project Layout and Clean Architecture principles (Handlers, Repositories, Models, and Middleware).
+
+## Features
+
+- **Authentication & Authorization:** Secure user registration and login with bcrypt password hashing and JWT (JSON Web Tokens).
+- **Role-Based Access Control (RBAC):** Admin and User roles. Sensitive management endpoints (e.g. Categories) are strictly restricted to Admin users via `AdminMiddleware`.
+- **Resource Ownership Verification:** Authors can edit and delete only their own articles and comments.
+- **Blog Posts Management:** Full CRUD operations for articles with `LEFT JOIN` queries for categories and authors.
+- **Categories System:** Category management for organizing articles.
+- **Likes & Favorites System:** Atomic toggle like mechanism (`POST /blogs/:id/like`) preventing duplicate likes via database constraints.
+- **Comments System:** Real-time discussion system (`POST`, `GET`, and `DELETE` comments with author validation).
+- **Masked Security Error Handling:** Database/SQL errors are masked from client responses to prevent internal information disclosure while detailed logs are recorded server-side.
+- **Database Migrations:** Automated database schema versioning managed via `golang-migrate` and custom helper scripts.
+
+---
 
 ## Tech Stack
 
 - **Language:** Go 1.26+
 - **Framework:** [Gin](https://github.com/gin-gonic/gin)
-- **Database:** PostgreSQL
-- **Driver:** [pgx v5](https://github.com/jackc/pgx) (connection pool)
-- **Authentication:** JWT (JSON Web Tokens) & bcrypt
-- **Migration:** [golang-migrate](https://github.com/golang-migrate/migrate)
-- **Hot Reload:** [Air](https://github.com/air-verse/air)
+- **Database:** PostgreSQL 14+
+- **Driver & Pool:** [pgx v5](https://github.com/jackc/pgx) (`pgxpool`)
+- **Authentication:** JWT (golang-jwt/jwt v5) & bcrypt
+- **Migrations:** [golang-migrate](https://github.com/golang-migrate/migrate)
+
+---
 
 ## Project Structure
 
@@ -18,92 +33,71 @@ A RESTful blog API built with Go, Gin, and PostgreSQL. Designed with a clean arc
 .
 ├── cmd/
 │   └── api/
-│       └── main.go                  # Application entrypoint & routes
+│       └── main.go                  # Application entrypoint & route registration
 ├── internal/
 │   ├── config/
-│   │   └── config.go                # Environment configuration
+│   │   └── config.go                # Environment variable configuration
 │   ├── database/
-│   │   └── postgres.go              # Database connection pool
+│   │   └── postgres.go              # PostgreSQL connection pool initialization
 │   ├── handlers/
 │   │   ├── blog_handler.go          # Blog HTTP handlers
 │   │   ├── category_handler.go      # Category HTTP handlers
-│   │   └── user_handler.go          # User authentication handlers
+│   │   ├── comment_handler.go       # Comment HTTP handlers
+│   │   ├── like_handler.go          # Like HTTP handlers
+│   │   └── user_handler.go          # Authentication HTTP handlers
 │   ├── middleware/
-│   │   └── auth_middleware.go       # JWT Authentication middleware
+│   │   ├── admin_middleware.go      # Admin role authorization middleware
+│   │   ├── auth_middleware.go       # JWT Bearer token middleware
+│   │   └── cors_middleware.go       # Cross-Origin Resource Sharing middleware
 │   ├── models/
 │   │   ├── blog.go                  # Blog model
 │   │   ├── category.go              # Category model
+│   │   ├── comment.go               # Comment model
+│   │   ├── like.go                  # Like model
 │   │   └── user.go                  # User model
 │   └── repository/
-│       ├── blog_repository.go       # Blog database queries
+│       ├── blog_repository.go       # Blog database queries & JOINs
 │       ├── category_repository.go   # Category database queries
+│       ├── comment_repository.go    # Comment database queries
+│       ├── like_repository.go       # Like toggle & count queries
 │       └── user_repository.go       # User database queries
-├── migrations/                       # SQL migration files
+├── migrations/                      # SQL migration files
 ├── scripts/
-│   └── migrate.sh                   # Migration helper script
-├── .air.toml                         # Air hot reload config
-├── .env                              # Environment variables
+│   └── migrate.sh                   # Helper script for migration operations
+├── .air.toml                        # Hot reload config
+├── .env                             # Environment variables
 ├── go.mod
 └── go.sum
 ```
 
-## Getting Started
+---
 
-### Prerequisites
+## Environment Variables
 
-- Go 1.26 or higher
-- PostgreSQL 14 or higher
-- [golang-migrate CLI](https://github.com/golang-migrate/migrate/tree/master/cmd/migrate)
-- [Air](https://github.com/air-verse/air) (optional, for hot reload)
-
-### Installation
-
-1. Clone the repository
-
-```bash
-git clone git@github.com:Chilhan23/golang-blog-api.git
-cd golang-blog-api
-```
-
-2. Install dependencies
-
-```bash
-go mod download
-```
-
-3. Set up environment variables
-
-Create a `.env` file in the project root:
+Create a `.env` file in the root directory:
 
 ```env
 DATABASE_URL=postgresql://postgres:password@localhost:5432/blog_api?sslmode=disable
 PORT=8080
-JWT_SECRET=your_super_secret_jwt_key
+JWT_SECRET=your_production_secret_key
 ```
 
-4. Create the database
+---
+
+## Database Migrations
+
+Run database migrations using the included helper script:
 
 ```bash
-psql -U postgres -c "CREATE DATABASE blog_api;"
-```
-
-5. Run migrations
-
-```bash
+# Apply all pending migrations
 ./scripts/migrate.sh up
+
+# Rollback last migration
+./scripts/migrate.sh down
+
+# Check migration status
+./scripts/migrate.sh status
 ```
-
-6. Start the server
-
-```bash
-# With Air (hot reload)
-air
-
-# Without Air
-go run ./cmd/api
-```
-
-The server will start at `http://localhost:8080`.
 
 ---
 
@@ -113,7 +107,7 @@ The server will start at `http://localhost:8080`.
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `GET`  | `/`      | No   | Server health check & DB status |
+| `GET`  | `/`      | None | Server health check and database status |
 
 ---
 
@@ -121,45 +115,52 @@ The server will start at `http://localhost:8080`.
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `POST` | `/auth/register` | No | Register a new user |
-| `POST` | `/auth/login`    | No | Authenticate user & receive JWT token |
+| `POST` | `/auth/register` | None | Register a new user (default role: `user`) |
+| `POST` | `/auth/login`    | None | Authenticate user and receive JWT token |
 
 #### `POST /auth/register`
+```json
+// Request Body
+{
+  "username": "johndoe",
+  "email": "john@example.com",
+  "password": "password123"
+}
 
-```bash
-curl -X POST http://localhost:8080/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username": "johndoe", "email": "john@example.com", "password": "password123"}'
+// Response (201 Created)
+{
+  "id": "e82e7f45-fef3-4c81-9524-0bdee7726d71",
+  "username": "johndoe",
+  "email": "john@example.com",
+  "created_at": "2026-07-21T11:00:00Z"
+}
 ```
 
 #### `POST /auth/login`
+```json
+// Request Body
+{
+  "username": "johndoe",
+  "password": "password123"
+}
 
-```bash
-curl -X POST http://localhost:8080/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "johndoe", "password": "password123"}'
+// Response (200 OK)
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
 ```
 
 ---
 
 ### Categories
 
-| Method   | Endpoint          | Auth | Description |
-|----------|-------------------|------|-------------|
-| `POST`   | `/categories`     | Yes  | Create a new category |
-| `GET`    | `/categories`     | No   | Get all categories |
-| `GET`    | `/categories/:id` | No   | Get category by ID |
-| `PUT`    | `/categories/:id` | Yes  | Update category |
-| `DELETE` | `/categories/:id` | Yes  | Delete category |
-
-#### `POST /categories`
-
-```bash
-curl -X POST http://localhost:8080/categories \
-  -H "Authorization: Bearer <TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Technology", "slug": "technology"}'
-```
+| Method   | Endpoint          | Auth | Role Access | Description |
+|----------|-------------------|------|-------------|-------------|
+| `GET`    | `/categories`     | None | Public      | Get all categories |
+| `GET`    | `/categories/:id` | None | Public      | Get category by ID |
+| `POST`   | `/categories`     | JWT  | Admin Only  | Create a new category |
+| `PUT`    | `/categories/:id` | JWT  | Admin Only  | Update a category |
+| `DELETE` | `/categories/:id` | JWT  | Admin Only  | Delete a category |
 
 ---
 
@@ -167,58 +168,29 @@ curl -X POST http://localhost:8080/categories \
 
 | Method   | Endpoint          | Auth | Description |
 |----------|-------------------|------|-------------|
-| `GET`    | `/blogs`          | No   | Get all public blog posts (with category names via `LEFT JOIN`) |
-| `GET`    | `/blogs/:id`      | No   | Get blog post by ID |
-| `POST`   | `/blogs`          | Yes  | Create a new blog post |
-| `GET`    | `/blogs/user`     | Yes  | Get blog posts authored by logged-in user |
-| `PUT`    | `/blogs/:id`      | Yes  | Update blog post (Owner only) |
-| `DELETE` | `/blogs/:id`      | Yes  | Delete blog post (Owner only) |
+| `GET`    | `/blogs`          | None | Get all blogs with author, category, and total likes |
+| `GET`    | `/blogs/:id`      | None | Get single blog by ID |
+| `GET`    | `/blogs/user`     | JWT  | Get blogs authored by currently logged-in user |
+| `POST`   | `/blogs`          | JWT  | Create a new blog post |
+| `PUT`    | `/blogs/:id`      | JWT  | Update blog post (Owner only) |
+| `DELETE` | `/blogs/:id`      | JWT  | Delete blog post (Owner only) |
 
-#### `POST /blogs`
-
-```bash
-curl -X POST http://localhost:8080/blogs \
-  -H "Authorization: Bearer <TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{"title": "Golang REST API", "content": "Building APIs with Gin and PostgreSQL", "category_id": 1}'
-```
-
+#### `GET /blogs` Response Example:
 ```json
-// 201 Created
-{
-  "message": "Blog created successfully",
-  "blog": {
-    "id": 1,
-    "title": "Golang REST API",
-    "content": "Building APIs with Gin and PostgreSQL",
-    "created_at": "2026-07-20T21:50:00Z",
-    "updated_at": "2026-07-20T21:50:00Z",
-    "user_id": "77051b22-ea10-4a78-a7de-f880e5b6d60a",
-    "category_id": 1
-  }
-}
-```
-
-#### `GET /blogs`
-
-```bash
-curl http://localhost:8080/blogs
-```
-
-```json
-// 200 OK
 {
   "message": "Blogs retrieved successfully",
   "blogs": [
     {
       "id": 1,
-      "title": "Golang REST API",
-      "content": "Building APIs with Gin and PostgreSQL",
-      "created_at": "2026-07-20T21:50:00Z",
-      "updated_at": "2026-07-20T21:50:00Z",
-      "user_id": "77051b22-ea10-4a78-a7de-f880e5b6d60a",
+      "title": "System Architecture Patterns",
+      "content": "Exploring distributed systems and database pooling in Go.",
+      "created_at": "2026-07-21T10:00:00Z",
+      "updated_at": "2026-07-21T10:00:00Z",
+      "user_id": "ae70c3bc-891c-4bd0-8fae-1af577867973",
+      "author_name": "johndoe",
       "category_id": 1,
-      "category_name": "Technology"
+      "category_name": "Engineering",
+      "total_likes": 12
     }
   ]
 }
@@ -226,49 +198,63 @@ curl http://localhost:8080/blogs
 
 ---
 
-### Error Handling
+### Likes
 
-| Status Code | Description |
-|-------------|-------------|
-| `400 Bad Request` | Invalid JSON input or validation failure |
-| `401 Unauthorized` | Missing, invalid, or expired JWT token |
-| `403 Forbidden` | User is not the owner of the resource |
-| `404 Not Found` | Requested resource does not exist |
-| `409 Conflict` | Duplicate resource (e.g. username/email/category name already exists) |
-| `500 Internal Server Error` | Unexpected server error (masked for security) |
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `POST` | `/blogs/:id/like` | JWT | Toggle like/unlike on a blog post |
 
----
-
-## Database Migration
-
-A helper script is provided to manage migrations using `golang-migrate`.
-
-```bash
-./scripts/migrate.sh up              # Apply all pending migrations
-./scripts/migrate.sh up <N>          # Apply next N migrations
-./scripts/migrate.sh down            # Rollback last migration (requires confirmation)
-./scripts/migrate.sh down all        # Rollback all migrations (requires confirmation)
-./scripts/migrate.sh create <name>   # Create new migration files
-./scripts/migrate.sh redo            # Rollback last and re-apply
-./scripts/migrate.sh status          # Show current version
-./scripts/migrate.sh force <V>       # Force set version (fix dirty state)
-./scripts/migrate.sh fresh           # Drop all tables & re-apply all
+#### `POST /blogs/:id/like` Response Example:
+```json
+{
+  "message": "Blog liked successfully",
+  "is_liked": true,
+  "total_likes": 13
+}
 ```
 
 ---
 
-## Roadmap
+### Comments
 
-- [x] Blog CRUD (Create, Read, Update, Delete)
+| Method   | Endpoint             | Auth | Authorization | Description |
+|----------|----------------------|------|---------------|-------------|
+| `GET`    | `/blogs/:id/comments`| None | Public        | Get all comments for a blog post |
+| `POST`   | `/blogs/:id/comments`| JWT  | User/Admin    | Post a comment on a blog post |
+| `DELETE` | `/comments/:id`      | JWT  | Owner or Admin| Delete a comment |
+
+#### `GET /blogs/:id/comments` Response Example:
+```json
+{
+  "message": "Comments retreived successfully",
+  "comments": [
+    {
+      "id": 1,
+      "blog_id": 1,
+      "user_id": "e82e7f45-fef3-4c81-9524-0bdee7726d71",
+      "user_name": "rayhan",
+      "content": "Great article on Go connection pooling!",
+      "created_at": "2026-07-21T11:20:00Z"
+    }
+  ]
+}
+```
+
+---
+
+## Roadmap Status
+
+- [x] Blog Posts CRUD & Ownership Verification
 - [x] User Authentication & Authorization (JWT & bcrypt)
-- [x] Blog Ownership Authorization (Owner-only Edit/Delete)
-- [x] Categories CRUD & Foreign Key Relation (`category_id` & `LEFT JOIN`)
-- [x] Masked Error Handling for Security
-- [ ] Likes
-- [ ] Comments with reply threads
+- [x] Categories Management & Database Relations (`LEFT JOIN`)
+- [x] Role-Based Access Control (Admin-only Category Management)
+- [x] Atomic Likes System (Toggle Like & Count)
+- [x] Comments System (Create, Read with Author JOIN, Delete Authorization)
+- [x] Masked Security Error Handling
+- [x] CORS Middleware Support for Frontend Clients
 
 ---
 
 ## License
 
-This project is for educational purposes.
+This project is open-source software under the MIT License.
